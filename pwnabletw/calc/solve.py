@@ -12,7 +12,7 @@ def conn():
         if args.GDB:
             p = gdb.debug([elf.path], aslr=True, api=False, gdbscript="""
                 b *calc+121
-                """)
+               """)
         else:
             p = process([elf.path])
 
@@ -51,7 +51,7 @@ def main():
 
     # pwn it
     p.recvuntil(b"===\n")
-    
+
     saved_ebp = read_mem(p, 360)
     ret_addr = saved_ebp - 28
 
@@ -86,4 +86,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
