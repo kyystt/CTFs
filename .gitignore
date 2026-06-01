@@ -1,6 +1,6 @@
 *.i64
 webpirates/
-*.gdb_history
+.gdb_history
 *.id0
 *.id1
 *.id2
