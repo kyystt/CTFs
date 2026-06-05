@@ -2,7 +2,7 @@
 
 from pwn import *
 
-elf = ELF("libc_32.so.6")
+elf = ELF("./hacknote_patched")
 libc = ELF("./libc_32.so.6")
 
 context.binary = elf
@@ -25,6 +25,27 @@ def conn():
             p = process([elf.path])
 
     return p
+
+def recv_menu(p):
+    p.recvuntil("Your choice :")
+
+def add_note(p, size, content):
+    recv_menu(p)
+    p.send(b"1")
+    p.sendafter(b"Note size :", str(size).encode())
+    p.sendafter(b"Content :", content)
+
+def delete_note(p, idx):
+    recv_menu(p)
+    p.send(b"2")
+    p.sendafter(b"Index :", str(idx).encode())
+    return p.recvline()
+
+def print_note(p, idx):
+    recv_menu(p)
+    p.send(b"3")
+    p.sendafter(b"Index :", str(idx).encode())
+    return p.recvline()
 
 def main():
     p = conn()
